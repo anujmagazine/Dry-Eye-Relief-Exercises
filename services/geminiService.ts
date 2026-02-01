@@ -35,9 +35,9 @@ async function decodeAudioData(
 export class GeminiVoiceService {
   private ai: GoogleGenAI;
   private audioContext: AudioContext | null = null;
+  private currentSource: AudioBufferSourceNode | null = null;
 
   constructor() {
-    // Initialize GoogleGenAI strictly using process.env.API_KEY per SDK guidelines
     this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
 
@@ -51,8 +51,22 @@ export class GeminiVoiceService {
     return this.audioContext;
   }
 
+  stop() {
+    if (this.currentSource) {
+      try {
+        this.currentSource.stop();
+        this.currentSource.disconnect();
+      } catch (e) {
+        // Source might already be stopped
+      }
+      this.currentSource = null;
+    }
+  }
+
   async speak(text: string) {
     try {
+      this.stop(); // Stop any existing audio before starting new one
+      
       const ctx = this.initAudio();
       
       const response = await this.ai.models.generateContent({
@@ -62,13 +76,12 @@ export class GeminiVoiceService {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' }, // Kore is soft and calm
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
             },
           },
         },
       });
 
-      // Extract audio data from response parts as per SDK examples for Modality.AUDIO
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (!base64Audio) return;
 
@@ -79,10 +92,20 @@ export class GeminiVoiceService {
         1
       );
 
+      // Re-check after async TTS call to avoid racing multiple speak calls
+      this.stop();
+
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(ctx.destination);
       source.start();
+      this.currentSource = source;
+      
+      source.onended = () => {
+        if (this.currentSource === source) {
+          this.currentSource = null;
+        }
+      };
     } catch (error) {
       console.error("TTS Error:", error);
     }

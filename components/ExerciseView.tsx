@@ -15,55 +15,63 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
   const [phaseSecondsLeft, setPhaseSecondsLeft] = useState(BLINK_CYCLES[0].duration);
   const [isFinished, setIsFinished] = useState(false);
   
-  // Use number type instead of NodeJS.Timeout for browser environment
   const timerRef = useRef<number | null>(null);
-  // Use number type instead of NodeJS.Timeout for browser environment
-  const totalTimerRef = useRef<number | null>(null);
+  const hasAnnouncedInitialRef = useRef(false);
 
-  const currentPhase = BLINK_CYCLES[currentPhaseIndex];
+  // Using a ref for the latest state to avoid effect dependency churn
+  const stateRef = useRef({
+    timeLeft,
+    currentPhaseIndex,
+    phaseSecondsLeft,
+    isFinished
+  });
+
+  useEffect(() => {
+    stateRef.current = { timeLeft, currentPhaseIndex, phaseSecondsLeft, isFinished };
+  }, [timeLeft, currentPhaseIndex, phaseSecondsLeft, isFinished]);
 
   const announcePhase = useCallback((phase: PhaseInfo) => {
     voiceService.speak(phase.instruction);
   }, []);
 
-  // Initial announcement
   useEffect(() => {
-    announcePhase(BLINK_CYCLES[0]);
-    
-    // Cleanup on unmount
-    return () => {
-      if (timerRef.current) window.clearInterval(timerRef.current);
-      if (totalTimerRef.current) window.clearInterval(totalTimerRef.current);
-    };
-  }, [announcePhase]);
-
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      setIsFinished(true);
-      return;
+    // Initial announcement only once on mount
+    if (!hasAnnouncedInitialRef.current) {
+      announcePhase(BLINK_CYCLES[0]);
+      hasAnnouncedInitialRef.current = true;
     }
 
-    // Explicitly use window.setInterval to ensure the return type is number
     timerRef.current = window.setInterval(() => {
-      setPhaseSecondsLeft((prev) => {
-        if (prev <= 1) {
-          // Transition phase
-          const nextIndex = (currentPhaseIndex + 1) % BLINK_CYCLES.length;
-          setCurrentPhaseIndex(nextIndex);
-          const nextPhase = BLINK_CYCLES[nextIndex];
-          announcePhase(nextPhase);
-          return nextPhase.duration;
-        }
-        return prev - 1;
-      });
+      const { timeLeft: tLeft, currentPhaseIndex: cIdx, phaseSecondsLeft: pLeft, isFinished: finished } = stateRef.current;
+      
+      if (finished || tLeft <= 0) {
+        if (timerRef.current) window.clearInterval(timerRef.current);
+        setIsFinished(true);
+        return;
+      }
 
-      setTimeLeft((prev) => prev - 1);
+      // Decrement phase time
+      if (pLeft <= 1) {
+        // Transition to next phase
+        const nextIdx = (cIdx + 1) % BLINK_CYCLES.length;
+        const nextPhase = BLINK_CYCLES[nextIdx];
+        
+        setCurrentPhaseIndex(nextIdx);
+        setPhaseSecondsLeft(nextPhase.duration);
+        announcePhase(nextPhase);
+      } else {
+        setPhaseSecondsLeft(pLeft - 1);
+      }
+
+      // Decrement total time
+      setTimeLeft(tLeft - 1);
     }, 1000);
 
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
+      voiceService.stop(); // Stop any speaking on exit
     };
-  }, [timeLeft, currentPhaseIndex, announcePhase]);
+  }, [announcePhase]);
 
   const handleRestart = () => {
     setTimeLeft(EXERCISE_TOTAL_DURATION);
@@ -78,6 +86,8 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
+
+  const currentPhase = BLINK_CYCLES[currentPhaseIndex];
 
   if (isFinished) {
     return (
@@ -105,7 +115,6 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
     );
   }
 
-  // Visual cues based on phase
   const getVisualScale = () => {
     if (currentPhase.phase === BlinkPhase.CLOSE) return 'scale-y-[0.1]';
     if (currentPhase.phase === BlinkPhase.PAUSE) return 'scale-y-[0.05]';
@@ -120,18 +129,11 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
       </div>
 
       <div className="flex flex-col items-center justify-center flex-grow w-full">
-        {/* Abstract Eye Indicator */}
         <div className="relative w-64 h-64 mb-16 flex items-center justify-center">
-          {/* Outer circle decoration */}
           <div className="absolute inset-0 border border-stone-200 rounded-full animate-pulse"></div>
-          
-          {/* Eye lid simulation */}
           <div className={`w-48 h-48 bg-stone-200 rounded-full transition-all duration-1000 ease-in-out ${getVisualScale()}`}>
-            {/* Pupil/Iris visual */}
              <div className="w-24 h-24 bg-stone-300 rounded-full m-auto mt-[25%] opacity-50"></div>
           </div>
-          
-          {/* Reflection decoration */}
           <div className="absolute top-1/4 right-1/4 w-4 h-4 bg-white/40 rounded-full"></div>
         </div>
 
@@ -152,8 +154,6 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
             Exit Session
           </button>
         </div>
-        
-        {/* Progress Bar */}
         <div className="w-full h-1 bg-stone-100 rounded-full overflow-hidden">
           <div 
             className="h-full bg-stone-400 transition-all duration-1000 ease-linear"
