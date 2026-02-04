@@ -1,7 +1,6 @@
 
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
-// Utility to decode base64
 function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -12,12 +11,11 @@ function decode(base64: string) {
   return bytes;
 }
 
-// Utility to decode PCM audio data
 async function decodeAudioData(
   data: Uint8Array,
   ctx: AudioContext,
   sampleRate: number,
-  numChannels: number,
+  numChannels: number
 ): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
@@ -55,60 +53,57 @@ export class GeminiVoiceService {
     if (this.currentSource) {
       try {
         this.currentSource.stop();
+        this.currentSource.onended = null;
         this.currentSource.disconnect();
-      } catch (e) {
-        // Source might already be stopped
-      }
+      } catch (e) {}
       this.currentSource = null;
     }
   }
 
-  async speak(text: string) {
-    try {
-      this.stop(); // Stop any existing audio before starting new one
-      
-      const ctx = this.initAudio();
-      
-      const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Say gently and slowly: ${text}` }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
-          },
-        },
-      });
+  async speak(text: string): Promise<void> {
+    return new Promise(async (resolve) => {
+      try {
+        this.stop();
+        const ctx = this.initAudio();
+        
+        const response = await this.ai.models.generateContent({
+          model: "gemini-2.5-flash-preview-tts",
+          contents: { parts: [{ text: "Speak the following medical instruction clearly and at a relaxed pace: " + text }] },
+          config: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: "Puck" }
+              }
+            }
+          }
+        });
 
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!base64Audio) return;
-
-      const audioBuffer = await decodeAudioData(
-        decode(base64Audio),
-        ctx,
-        24000,
-        1
-      );
-
-      // Re-check after async TTS call to avoid racing multiple speak calls
-      this.stop();
-
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      source.start();
-      this.currentSource = source;
-      
-      source.onended = () => {
-        if (this.currentSource === source) {
-          this.currentSource = null;
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (!base64Audio) {
+          resolve();
+          return;
         }
-      };
-    } catch (error) {
-      console.error("TTS Error:", error);
-    }
+
+        const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
+        this.stop();
+
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        
+        source.onended = () => {
+          this.currentSource = null;
+          resolve();
+        };
+
+        source.start();
+        this.currentSource = source;
+      } catch (error) {
+        console.warn("TTS Error:", error);
+        resolve(); // Continue even on error
+      }
+    });
   }
 }
 

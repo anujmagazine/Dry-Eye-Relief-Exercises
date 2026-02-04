@@ -8,26 +8,28 @@ interface InfoViewProps {
 const InfoView: React.FC<InfoViewProps> = ({ onBack }) => {
   return (
     <div className="max-w-2xl mx-auto px-6 py-12 text-center flex flex-col items-center min-h-screen">
-      <h2 className="text-3xl font-serif mb-8 text-stone-800">Why Blink Consciously?</h2>
+      <h2 className="text-3xl font-serif mb-8 text-stone-800">About the TBUT Test</h2>
       
-      <div className="space-y-6 text-stone-600 leading-relaxed text-lg">
+      <div className="space-y-6 text-stone-600 leading-relaxed text-lg text-left">
         <p>
-          In our modern world of screens, our blink rate drops significantly. Often, when we do blink, it's an "incomplete blink."
+          <strong>Tear Break-Up Time (TBUT)</strong> is the clinical measurement of the time it takes for your tear film to evaporate or "break up" after a blink.
         </p>
         <div className="bg-stone-100 p-6 rounded-2xl border border-stone-200">
-          <h3 className="font-semibold text-stone-800 mb-2 italic">The Meibomian Glands</h3>
-          <p>
-            When you complete a full, conscious blink, your eyelids apply pressure to the Meibomian glands. This releases vital oils into your tear film, preventing evaporation and keeping your eyes hydrated.
-          </p>
+          <h3 className="font-semibold text-stone-800 mb-2">Standard Benchmarks:</h3>
+          <ul className="space-y-2 text-sm">
+            <li><span className="text-green-600 font-bold">&gt; 10 seconds:</span> Healthy stability.</li>
+            <li><span className="text-amber-600 font-bold">5 - 10 seconds:</span> Marginal stability.</li>
+            <li><span className="text-red-600 font-bold">&lt; 5 seconds:</span> Tear film instability (Severe Dry Eye).</li>
+          </ul>
         </div>
         <p>
-          Severe dry eye often stems from these oils not being replenished. 2 minutes of focused exercise "resets" this natural pump mechanism.
+          This self-assessment tracks your symptoms at home. If you consistently score under 10 seconds, consult an eye professional.
         </p>
       </div>
 
       <button 
         onClick={onBack}
-        className="mt-12 px-8 py-3 bg-stone-800 text-stone-50 rounded-full hover:bg-stone-700 transition-colors duration-300 font-medium tracking-wide shadow-sm"
+        className="mt-12 px-12 py-4 bg-stone-800 text-stone-50 rounded-full hover:bg-stone-700 transition-colors font-medium"
       >
         Understood
       </button>
