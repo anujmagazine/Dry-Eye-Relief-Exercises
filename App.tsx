@@ -22,8 +22,7 @@ const App: React.FC = () => {
         {currentScreen === 'home' && (
           <HomeView 
             onStartTest={() => setCurrentScreen('test')} 
-            onStartExercise={() => setCurrentScreen('exercise')} 
-            onReadMore={() => setCurrentScreen('info')}
+            onStartExercise={() => setCurrentScreen('exercise')}
           />
         )}
         
