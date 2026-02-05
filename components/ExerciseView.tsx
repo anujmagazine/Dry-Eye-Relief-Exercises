@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BlinkPhase, BLINK_CYCLES, PhaseInfo } from '../types.ts';
+import React, { useState, useEffect, useRef } from 'react';
+import { BlinkPhase, BLINK_CYCLES } from '../types.ts';
 import { voiceService } from '../services/geminiService.ts';
 
 interface ExerciseViewProps {
@@ -8,6 +8,7 @@ interface ExerciseViewProps {
 }
 
 const EXERCISE_TOTAL_DURATION = 120; // 2 minutes
+const INTRO_TEXT = "Starting your two-minute blinking exercise. Keep your eyes open and relax.";
 
 const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
   const [timeLeft, setTimeLeft] = useState(EXERCISE_TOTAL_DURATION);
@@ -15,24 +16,48 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
   const [phaseSecondsLeft, setPhaseSecondsLeft] = useState(BLINK_CYCLES[0].duration);
   const [isFinished, setIsFinished] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [isPreloading, setIsPreloading] = useState(true);
   
   const timerRef = useRef<number | null>(null);
 
-  const startExercise = async () => {
-    setIsActive(true);
-    await voiceService.speak("Starting your two-minute blinking exercise. " + BLINK_CYCLES[0].instruction);
-  };
-
-  const announcePhase = useCallback(async (phase: PhaseInfo) => {
-    await voiceService.speak(phase.instruction);
+  // Initial Preload
+  useEffect(() => {
+    const preloadAll = async () => {
+      try {
+        await voiceService.preload(INTRO_TEXT);
+        for (const cycle of BLINK_CYCLES) {
+          await voiceService.preload(cycle.instruction);
+        }
+      } catch (e) {
+        console.error("Failed to preload audio assets", e);
+      } finally {
+        setIsPreloading(false);
+      }
+    };
+    preloadAll();
+    return () => voiceService.stop();
   }, []);
 
+  // Trigger voice exactly when phase index changes
   useEffect(() => {
-    if (!isActive) return;
+    if (isActive && !isFinished) {
+      const instruction = BLINK_CYCLES[currentPhaseIndex].instruction;
+      voiceService.speak(instruction);
+    }
+  }, [currentPhaseIndex, isActive, isFinished]);
+
+  const startExercise = async () => {
+    setIsActive(true);
+    // Intro text is already preloaded
+    await voiceService.speak(INTRO_TEXT);
+  };
+
+  useEffect(() => {
+    if (!isActive || isFinished) return;
 
     timerRef.current = window.setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) {
+        if (prev <= 0) {
           setIsFinished(true);
           if (timerRef.current) window.clearInterval(timerRef.current);
           return 0;
@@ -41,18 +66,13 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
       });
 
       setPhaseSecondsLeft(prev => {
-        if (prev <= 1) {
-          // Move to next phase
+        if (prev <= 0) {
+          // Switch phase state
           setCurrentPhaseIndex(currentIdx => {
             const nextIdx = (currentIdx + 1) % BLINK_CYCLES.length;
-            const nextPhase = BLINK_CYCLES[nextIdx];
-            announcePhase(nextPhase);
             return nextIdx;
           });
-          // Note: we can't easily return the next duration here directly from setPhaseSecondsLeft 
-          // because it depends on the index we just updated. 
-          // We use a small hack or just rely on the effect below to sync it.
-          return -1; 
+          return -1; // Flag for reset
         }
         return prev - 1;
       });
@@ -60,11 +80,10 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
 
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
-      voiceService.stop();
     };
-  }, [isActive, announcePhase]);
+  }, [isActive, isFinished]);
 
-  // Sync the phase duration when the index changes
+  // Cleanup/Sync phase duration
   useEffect(() => {
     if (phaseSecondsLeft === -1) {
       setPhaseSecondsLeft(BLINK_CYCLES[currentPhaseIndex].duration);
@@ -77,7 +96,7 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
     setPhaseSecondsLeft(BLINK_CYCLES[0].duration);
     setIsFinished(false);
     setIsActive(true);
-    announcePhase(BLINK_CYCLES[0]);
+    voiceService.speak(INTRO_TEXT);
   };
 
   const formatTime = (seconds: number) => {
@@ -86,12 +105,21 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  if (isPreloading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center px-6 bg-[#FDFBF7]">
+        <div className="w-16 h-16 border-4 border-stone-200 border-t-stone-800 rounded-full animate-spin mb-6"></div>
+        <h2 className="text-xl font-serif text-stone-600">Calibrating Audio...</h2>
+      </div>
+    );
+  }
+
   if (!isActive) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center px-6 bg-[#FDFBF7]">
         <h2 className="text-3xl font-serif mb-6 text-stone-800">Conscious Blinking</h2>
         <p className="text-stone-500 mb-10 max-w-sm leading-relaxed">
-          This 2-minute session helps restore the lipid layer of your tear film by ensuring full, complete blinks.
+          This session ensures your eyelids fully close and seal, spreading vital lipids across the eye surface.
         </p>
         <button 
           onClick={startExercise}
@@ -116,7 +144,7 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
         </div>
         <h2 className="text-3xl font-serif mb-4 text-stone-800">Session Complete</h2>
-        <p className="text-stone-600 mb-12 max-w-sm">Your eyes should feel more lubricated. Consistency is key for severe dry eye relief.</p>
+        <p className="text-stone-600 mb-12 max-w-sm">Consistency is the key to treating severe dry eye. Practice this twice daily.</p>
         <div className="flex flex-col gap-4 w-full max-w-xs">
           <button 
             onClick={handleRestart}
@@ -140,29 +168,28 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
   const getVisualStyles = () => {
     switch(currentPhase.phase) {
       case BlinkPhase.CLOSE:
-        return 'scale-y-[0.1] bg-stone-400 opacity-60 rounded-[100px]';
+        return 'scale-y-[0.15] bg-stone-300 rounded-[80px]';
       case BlinkPhase.PAUSE:
-        return 'scale-y-[0.05] bg-stone-500 opacity-40 rounded-[100px]';
+        return 'scale-y-[0.08] bg-stone-400 rounded-[100px] blur-[1px]';
       case BlinkPhase.OPEN:
       default:
-        return 'scale-y-100 bg-stone-200 rounded-full';
+        return 'scale-y-100 bg-stone-100 rounded-full';
     }
   };
 
   return (
     <div className="flex flex-col items-center justify-between min-h-screen py-12 px-6 overflow-hidden bg-[#FDFBF7]">
       <div className="text-center">
-        <h3 className="text-stone-400 font-medium tracking-widest uppercase text-[10px] mb-1">Time Remaining</h3>
+        <h3 className="text-stone-400 font-medium tracking-widest uppercase text-[10px] mb-1">Total Remaining</h3>
         <span className="text-3xl font-light text-stone-700 tabular-nums">{formatTime(timeLeft)}</span>
       </div>
 
       <div className="flex flex-col items-center justify-center flex-grow w-full max-w-lg">
-        <div className="relative w-64 h-64 mb-12 flex items-center justify-center">
-          <div className="absolute inset-0 border border-stone-100 rounded-full scale-110"></div>
-          <div className="absolute inset-0 border border-stone-200 rounded-full animate-ping opacity-5"></div>
+        <div className="relative w-72 h-72 mb-12 flex items-center justify-center">
+          <div className="absolute inset-0 border border-stone-100 rounded-full"></div>
           
-          <div className={`w-52 h-52 transition-all duration-700 ease-in-out flex items-center justify-center overflow-hidden border border-stone-100 shadow-inner ${getVisualStyles()}`}>
-             <div className="w-16 h-16 bg-stone-800/10 rounded-full"></div>
+          <div className={`w-56 h-56 transition-all duration-[800ms] ease-in-out flex items-center justify-center overflow-hidden border border-stone-200 shadow-inner ${getVisualStyles()}`}>
+             <div className="w-20 h-20 bg-stone-800/5 rounded-full"></div>
           </div>
         </div>
 
@@ -171,10 +198,10 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
             {currentPhase.instruction}
           </h2>
           <div className="flex gap-3">
-            {Array.from({ length: currentPhase.duration }).map((_, i) => (
+            {Array.from({ length: BLINK_CYCLES[currentPhaseIndex].duration }).map((_, i) => (
               <div 
                 key={i} 
-                className={`w-2.5 h-2.5 rounded-full transition-all duration-500 ${i < (currentPhase.duration - phaseSecondsLeft) ? 'bg-stone-600 scale-110' : 'bg-stone-200'}`}
+                className={`w-3 h-3 rounded-full transition-all duration-700 ${i < (BLINK_CYCLES[currentPhaseIndex].duration - Math.max(0, phaseSecondsLeft)) ? 'bg-stone-700 scale-125' : 'bg-stone-200'}`}
               />
             ))}
           </div>
@@ -185,9 +212,9 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
         <div className="flex justify-center mb-8">
            <button 
             onClick={onExit}
-            className="px-8 py-2 text-stone-400 hover:text-stone-800 transition-colors text-xs font-semibold tracking-widest uppercase border border-transparent hover:border-stone-200 rounded-full"
+            className="px-8 py-2 text-stone-400 hover:text-stone-800 transition-colors text-xs font-semibold tracking-widest uppercase border border-stone-200 hover:bg-white rounded-full"
           >
-            Cancel Session
+            End Early
           </button>
         </div>
         <div className="w-full h-1 bg-stone-100 rounded-full overflow-hidden">

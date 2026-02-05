@@ -23,7 +23,7 @@ export interface PhaseInfo {
 export const BLINK_CYCLES: PhaseInfo[] = [
   { phase: BlinkPhase.OPEN, duration: 4, instruction: "Keep your eyes open and relax." },
   { phase: BlinkPhase.CLOSE, duration: 3, instruction: "Close your eyes gently." },
-  { phase: BlinkPhase.PAUSE, duration: 3, instruction: "Squeeze your eyelids slightly and hold." }
+  { phase: BlinkPhase.PAUSE, duration: 4, instruction: "Squeeze your eyelids slightly and hold." }
 ];
 
 export function getCategory(seconds: number): TestResult {

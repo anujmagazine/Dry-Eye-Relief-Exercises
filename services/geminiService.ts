@@ -34,6 +34,7 @@ export class GeminiVoiceService {
   private ai: GoogleGenAI;
   private audioContext: AudioContext | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
+  private audioCache: Map<string, AudioBuffer> = new Map();
 
   constructor() {
     this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -52,41 +53,66 @@ export class GeminiVoiceService {
   stop() {
     if (this.currentSource) {
       try {
-        this.currentSource.stop();
         this.currentSource.onended = null;
+        this.currentSource.stop();
         this.currentSource.disconnect();
       } catch (e) {}
       this.currentSource = null;
     }
   }
 
+  /**
+   * Pre-fetches and decodes audio for a given text, storing it in the local cache.
+   */
+  async preload(text: string): Promise<void> {
+    if (this.audioCache.has(text)) return;
+
+    try {
+      const ctx = this.initAudio();
+      const response = await this.ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: { parts: [{ text: "Speak the following medical instruction clearly and at a relaxed pace: " + text }] },
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: "Puck" }
+            }
+          }
+        }
+      });
+
+      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (base64Audio) {
+        const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
+        this.audioCache.set(text, audioBuffer);
+      }
+    } catch (error) {
+      console.warn("Preload Error for:", text, error);
+    }
+  }
+
+  /**
+   * Plays audio from cache if available, otherwise fetches and plays.
+   */
   async speak(text: string): Promise<void> {
     return new Promise(async (resolve) => {
       try {
         this.stop();
         const ctx = this.initAudio();
         
-        const response = await this.ai.models.generateContent({
-          model: "gemini-2.5-flash-preview-tts",
-          contents: { parts: [{ text: "Speak the following medical instruction clearly and at a relaxed pace: " + text }] },
-          config: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: "Puck" }
-              }
-            }
-          }
-        });
+        let audioBuffer = this.audioCache.get(text);
 
-        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (!base64Audio) {
+        if (!audioBuffer) {
+          console.debug("Cache miss for:", text);
+          await this.preload(text);
+          audioBuffer = this.audioCache.get(text);
+        }
+
+        if (!audioBuffer) {
           resolve();
           return;
         }
-
-        const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
-        this.stop();
 
         const source = ctx.createBufferSource();
         source.buffer = audioBuffer;
@@ -100,8 +126,8 @@ export class GeminiVoiceService {
         source.start();
         this.currentSource = source;
       } catch (error) {
-        console.warn("TTS Error:", error);
-        resolve(); // Continue even on error
+        console.warn("Speak Error:", error);
+        resolve();
       }
     });
   }
