@@ -35,7 +35,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onStartTest, onStartExercise, onRea
           onClick={onStartTest}
           className="w-full py-4 bg-white border border-stone-200 text-stone-800 rounded-full hover:bg-stone-50 transition-all font-medium tracking-wide"
         >
-          Take Stability Test
+          Take Stability Test (TBUT)
         </button>
         <button 
           onClick={onReadMore}
