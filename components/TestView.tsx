@@ -80,7 +80,8 @@ const TestView: React.FC<TestViewProps> = ({ onComplete, onCancel }) => {
              </div>
           ) : (
             <div className="w-48 h-48 bg-white rounded-full flex items-center justify-center overflow-hidden border border-stone-200 shadow-sm transition-all duration-500">
-               <div className="w-14 h-14 bg-stone-800 rounded-full shadow-lg relative">
+               {/* Target circle: Changed from bg-stone-800 to bg-sky-500 for better visibility and clinical feel */}
+               <div className="w-14 h-14 bg-sky-500 rounded-full shadow-lg relative transition-colors duration-500">
                   <div className="absolute top-2 left-2 w-3 h-3 bg-white/30 rounded-full"></div>
                </div>
             </div>
