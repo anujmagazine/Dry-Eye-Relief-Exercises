@@ -6,6 +6,7 @@ import TestView from './components/TestView.tsx';
 import ResultsView from './components/ResultsView.tsx';
 import InfoView from './components/InfoView.tsx';
 import ExerciseView from './components/ExerciseView.tsx';
+import PalmingView from './components/PalmingView.tsx';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppState>('home');
@@ -23,6 +24,7 @@ const App: React.FC = () => {
           <HomeView 
             onStartTest={() => setCurrentScreen('test')} 
             onStartExercise={() => setCurrentScreen('exercise')}
+            onStartPalming={() => setCurrentScreen('palming')}
           />
         )}
         
@@ -35,6 +37,12 @@ const App: React.FC = () => {
 
         {currentScreen === 'exercise' && (
           <ExerciseView 
+            onExit={() => setCurrentScreen('home')}
+          />
+        )}
+
+        {currentScreen === 'palming' && (
+          <PalmingView 
             onExit={() => setCurrentScreen('home')}
           />
         )}

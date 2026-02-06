@@ -1,5 +1,5 @@
 
-export type AppState = 'home' | 'test' | 'results' | 'info' | 'exercise';
+export type AppState = 'home' | 'test' | 'results' | 'info' | 'exercise' | 'palming';
 
 export interface TestResult {
   seconds: number;
