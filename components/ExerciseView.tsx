@@ -41,15 +41,17 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
   // Trigger voice exactly when phase index changes
   useEffect(() => {
     if (isActive && !isFinished) {
+      // If it's the very first phase of the session, we can prepend the intro or just play instruction
       const instruction = BLINK_CYCLES[currentPhaseIndex].instruction;
+      // To avoid overlap with startExercise, we rely primarily on this effect for the instruction
       voiceService.speak(instruction);
     }
   }, [currentPhaseIndex, isActive, isFinished]);
 
   const startExercise = async () => {
-    setIsActive(true);
-    // Intro text is already preloaded
+    // We play the intro first, then set isActive to start the cycles
     await voiceService.speak(INTRO_TEXT);
+    setIsActive(true);
   };
 
   useEffect(() => {
@@ -95,8 +97,7 @@ const ExerciseView: React.FC<ExerciseViewProps> = ({ onExit }) => {
     setCurrentPhaseIndex(0);
     setPhaseSecondsLeft(BLINK_CYCLES[0].duration);
     setIsFinished(false);
-    setIsActive(true);
-    voiceService.speak(INTRO_TEXT);
+    startExercise();
   };
 
   const formatTime = (seconds: number) => {

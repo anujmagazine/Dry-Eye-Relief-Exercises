@@ -8,11 +8,31 @@ interface PalmingViewProps {
 
 const PALMING_DURATION = 180; // 3 minutes
 const STEPS = [
-  { time: 180, text: "Rub your palms together vigorously to generate warmth.", voice: "Start by rubbing your palms together until they feel warm." },
-  { time: 170, text: "Cup your eyes gently. Avoid pressing the eyeballs.", voice: "Now, gently cup your palms over your closed eyes. Ensure no light gets in, but do not press against your eyelids." },
-  { time: 150, text: "Breathe deeply and sink into the darkness.", voice: "Focus on the darkness. Breathe slowly and let your eye muscles completely relax." },
-  { time: 60, text: "Almost there. Feel the tension leaving your brow.", voice: "Halfway through. Let go of any tension in your forehead and jaw." },
-  { time: 10, text: "Gently remove your hands and blink softly.", voice: "The session is ending. Gently remove your hands and blink slowly as you adjust to the light." }
+  { 
+    time: 180, 
+    text: "Rub your palms together vigorously to generate warmth.", 
+    voice: "Welcome to deep relaxation. Start by rubbing your palms together until they feel warm." 
+  },
+  { 
+    time: 170, 
+    text: "Cup your eyes gently. Avoid pressing the eyeballs.", 
+    voice: "Now, gently cup your palms over your closed eyes. Ensure no light gets in, but do not press against your eyelids." 
+  },
+  { 
+    time: 150, 
+    text: "Breathe deeply and sink into the darkness.", 
+    voice: "Focus on the darkness. Breathe slowly and let your eye muscles completely relax." 
+  },
+  { 
+    time: 60, 
+    text: "Almost there. Feel the tension leaving your brow.", 
+    voice: "Halfway through. Let go of any tension in your forehead and jaw." 
+  },
+  { 
+    time: 10, 
+    text: "Gently remove your hands and blink softly.", 
+    voice: "The session is ending. Gently remove your hands and blink slowly as you adjust to the light." 
+  }
 ];
 
 const PalmingView: React.FC<PalmingViewProps> = ({ onExit }) => {
@@ -22,8 +42,8 @@ const PalmingView: React.FC<PalmingViewProps> = ({ onExit }) => {
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Initial voice instruction
-    voiceService.speak("Welcome to deep relaxation. Let's begin by warming your hands.");
+    // We remove the manual voiceService.speak call from here because 
+    // it overlaps with the trigger in the [timeLeft] effect at 180s.
     setIsActive(true);
     
     return () => {
@@ -53,10 +73,10 @@ const PalmingView: React.FC<PalmingViewProps> = ({ onExit }) => {
   // Handle voice triggers at specific timestamps
   useEffect(() => {
     const currentStep = STEPS.find(s => s.time === timeLeft);
-    if (currentStep) {
+    if (currentStep && isActive) {
       voiceService.speak(currentStep.voice);
     }
-  }, [timeLeft]);
+  }, [timeLeft, isActive]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
