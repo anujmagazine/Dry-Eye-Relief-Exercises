@@ -19,8 +19,10 @@ const HomeView: React.FC<HomeViewProps> = ({ onStartTest, onStartExercise, onSta
           </svg>
         </div>
         <h1 className="text-3xl font-serif text-stone-800 mb-2">BlinkRest</h1>
-        <p className="text-stone-500 max-w-xs mx-auto text-sm leading-relaxed">
-          Restore your eye health with clinical tests and rhythmic breathing for your eyes.
+        <p className="text-stone-500 max-w-lg mx-auto text-sm leading-relaxed">
+          Dry eyes happen when your natural tears dry up too fast, leaving your eyes feeling scratchy, tired, or sore. 
+          BlinkRest helps you check your tear health, practice "good" blinks to keep eyes moist, and gives your 
+          eyes a warm, dark rest to stop squinting and strain.
         </p>
       </header>
 
